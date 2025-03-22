@@ -1,0 +1,104 @@
+import speech_recognition as sr
+import pyttsx3
+import datetime
+import wikipedia
+import pywhatkit
+import openai
+import os
+
+# OpenAI API Key (Replace with your key)
+openai.api_key = "your_openai_api_key"
+
+# Initialize speech recognition and text-to-speech
+recognizer = sr.Recognizer()
+engine = pyttsx3.init()
+
+# Set voice properties
+voices = engine.getProperty('voices')
+engine.setProperty('voice', voices[1].id)  # Change to voices[0].id for male voice
+
+def speak(text):
+    """Converts text to speech."""
+    engine.say(text)
+    engine.runAndWait()
+
+def listen():
+    """Listens for user commands with a wake word."""
+    with sr.Microphone() as source:
+        print("Listening for wake word...")
+        recognizer.adjust_for_ambient_noise(source, duration=1)
+        audio = recognizer.listen(source)
+
+    try:
+        command = recognizer.recognize_google(audio).lower()
+        print(f"You said: {command}")
+
+        if "assistant" in command:
+            speak("Yes, I am listening!")
+            return command.replace("assistant", "").strip()
+
+    except sr.UnknownValueError:
+        return ""
+    except sr.RequestError:
+        speak("Network issue, please check your connection.")
+        return ""
+    return ""
+
+def ask_chatgpt(prompt):
+    """Uses ChatGPT to answer user queries."""
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response["choices"][0]["message"]["content"]
+    except Exception as e:
+        return "Sorry, I couldn't connect to OpenAI."
+
+def process_command(command):
+    """Processes user commands."""
+    if "time" in command:
+        current_time = datetime.datetime.now().strftime("%H:%M")
+        speak(f"The current time is {current_time}")
+
+    elif "search" in command:
+        query = command.replace("search", "").strip()
+        speak(f"Searching for {query} on Wikipedia...")
+        try:
+            result = wikipedia.summary(query, sentences=1)
+            speak(result)
+        except wikipedia.exceptions.DisambiguationError:
+            speak("There are multiple results. Please be more specific.")
+        except wikipedia.exceptions.PageError:
+            speak("No relevant results found.")
+
+    elif "play" in command:
+        song = command.replace("play", "").strip()
+        speak(f"Playing {song} on YouTube...")
+        pywhatkit.playonyt(song)
+
+    elif "open notepad" in command:
+        speak("Opening Notepad...")
+        os.system("notepad")
+
+    elif "chat" in command:
+        question = command.replace("chat", "").strip()
+        speak("Thinking...")
+        answer = ask_chatgpt(question)
+        speak(answer)
+
+    elif "exit" in command or "stop" in command:
+        speak("Goodbye! Have a great day.")
+        exit()
+
+    else:
+        speak("Sorry, I don't recognize that command.")
+
+# Main loop
+if __name__ == "__main__":
+    speak("Hello! I am your assistant ellope. Say 'Hey Assistant' to activate me.")
+
+    while True:
+        user_command = listen()
+        if user_command:
+            process_command(user_command)
